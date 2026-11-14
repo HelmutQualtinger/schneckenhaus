@@ -15,7 +15,7 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel**, **Nautilus (Tintenf
   - **Länge**: Anzahl der Windungen; das Gehäuse wächst an der Mündung, die Spitze bleibt fest
   - **Steigung**: Verschiebung entlang der Windungsachse (0 = flach wie Nautilus, hoch = Turmschnecke)
 - **Vier Grundformen** per Knopfdruck: Schnecke, Tintenfisch (Nautilus), Muschel (zwei gespiegelte Klappen), Ammonit (flache Spirale mit Querrippen)
-- **11 prozedurale Schalenmuster** mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
+- **13 Schalenmuster** (11 prozedurale Muster und 2 Flaggen) mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
 - Scharfe Spitze, perlmuttartig schimmernde Innenseite, Anwachslinien und Rippen als Relief
 - Drehen, Zoomen und Verschieben mit Maus oder Touch
 - **Export als 3MF, OBJ, GLB oder STL** für 3D-Druck und 3D-Programme: massiver, wasserdichter Körper mit Muster-Relief und Bildtextur
@@ -33,7 +33,7 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel**, **Nautilus (Tintenf
 |---|---|---|---|---|
 | Zickzack-Flammen | Tigerstreifen (Nautilus) | Herzmuschel-Rippen | Bänderschnecke | Zeltmuster (Kegelschnecke) |
 | Leopardenpunkte | Würfelmuster | Porzellanweiß | Dunkel gerippt | Feine Wellenlinien |
-| Fossil (Ammonit) | | | | |
+| Fossil (Ammonit) | Flagge Palästina | Flagge Russland | | |
 
 ![Muster-Auswahl](assets/screenshot-muster.png)
 
@@ -82,7 +82,7 @@ Ansichten lassen sich als Link teilen:
 | Parameter | Bedeutung | Beispiel |
 |---|---|---|
 | `preset` | `schnecke`, `nautilus`, `muschel`, `ammonit` | `?preset=nautilus` |
-| `pattern` | Muster-Schlüssel (`zickzack`, `tiger`, `rippen`, `baender`, `zelt`, `punkte`, `schach`, `porzellan`, `gerippt`, `wellen`, `fossil`) | `?pattern=zelt` |
+| `pattern` | Muster-Schlüssel (`zickzack`, `tiger`, `rippen`, `baender`, `zelt`, `punkte`, `schach`, `porzellan`, `gerippt`, `wellen`, `fossil`, `flagge_ps`, `flagge_ru`) | `?pattern=zelt` |
 | `psi`, `turns`, `T` | Öffnungswinkel, Windungen, Steigung | `?psi=7&turns=8&T=3` |
 | `clean` | Bedienfeld ausblenden (für Screenshots) | `?preset=muschel&clean` |
 

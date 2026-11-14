@@ -11,7 +11,7 @@ Interaktive 3D-Spiralgehäuse (Schnecke, Muschel, Nautilus) mit Three.js. Eine e
 ## Aufbau von index.html
 
 - `PRESETS`: Grundformen Schnecke, Nautilus, Muschel, Ammonit (Geometrieparameter, Standardmuster, Innenmaterial). `crossRibs`/`crossRibAmp` erzeugen Querrippen über die Windung (Ammonit).
-- `PATTERNS` + `PATTERN_DEFAULTS`: die 11 Muster. Fehlende Felder werden aus den Defaults ergänzt.
+- `PATTERNS` + `PATTERN_DEFAULTS`: die 13 Muster. Fehlende Felder werden aus den Defaults ergänzt. Flaggen (`flag: 'ps' | 'ru'`, Definitionen in `FLAGS`) füllen die sichtbare Außenhälfte der Röhre (Kachelzeilen 0,25–0,75, Oberkante zur Spitze), eine Flagge pro Kachel ≈ eine Windung.
 - `makeShellTextures(pattern, size)`: berechnet Farb- und Reliefkarte pixelweise auf einem Canvas. Alle Terme müssen in u und v periodisch sein (ganzzahlige Frequenzen, periodisches Noise), sonst entstehen Nähte. Ausnahme ist der zelluläre Automat, der nur in v periodisch ist.
 - `buildShellGeometry(params)`: Raup-Modell. Spitze fest bei θ = 0, das Gehäuse wächst zur Mündung. Hinter der Spitze werden versteckte Windungen erzeugt (`theta0`), dann schließt Zeile 0 im Grenzpunkt (scharfe Spitze).
 - `rebuild(refit)` / `fitView(animated)`: Beim Ziehen des Längenreglers bleibt der Maßstab fest. Erst beim Loslassen (`change`-Event) wird weich neu eingepasst.

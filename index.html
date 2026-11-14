@@ -235,8 +235,37 @@ const PATTERNS = {
                 growth:160, growthDark:0.06, bump:0.7 },
   fossil:     { name:'Fossil (Ammonit)', base:[158,132,104], mid:[118,96,74], dark:[84,66,50],
                 bands:1, bandStrength:0.25, flames:3, zigAmp:0.4, flameLo:0.55, flameHi:0.9, flameStrength:0.3,
-                growth:110, growthDark:0.12, growthBump:0.8, bump:1.4 }
+                growth:110, growthDark:0.12, growthBump:0.8, bump:1.4 },
+  flagge_ps:  { name:'Flagge Palästina', flag:'ps', growth:150, growthDark:0.05, growthBump:0.6, bump:0.6 },
+  flagge_ru:  { name:'Flagge Russland', flag:'ru', growth:150, growthDark:0.05, growthBump:0.6, bump:0.6 }
 };
+
+// Flags: colour at (x, y) in [0,1]² of the texture tile (y = 0 top), anti-aliased edges.
+// x runs along the growth direction (one flag per tile ≈ one turn, aspect ≈ 2:1), y around the tube.
+const FLAGS = {
+  ps: { // Palestine: black / white / green, red triangle at the hoist reaching 1/3 of the length
+    stripes: [[0,0,0], [255,255,255], [0,151,54]], tri: [238,42,53], triLen: 1 / 3 },
+  ru: { // Russia: white / blue / red
+    stripes: [[255,255,255], [0,57,166], [213,43,30]] }
+};
+function flagColor(F, x, y0, px0) {
+  // the flag fills the visible outer half of the tube (rows 0.25..0.75, top edge towards the apex);
+  // the outer stripes continue around the hidden inner side
+  const y = Math.min(1, Math.max(0, (y0 - 0.25) / 0.5)), px = px0 / 0.5;
+  const n = F.stripes.length;
+  const k = Math.min(n - 1, Math.floor(y * n));
+  let c = F.stripes[k].slice();
+  // soften stripe borders over one pixel
+  const fy = y * n - k;
+  if (fy < px * n && k > 0) { const t = 0.5 + fy / (2 * px * n); c = c.map((x, i) => F.stripes[k - 1][i] + (x - F.stripes[k - 1][i]) * t); }
+  if (F.tri) {
+    // triangle: base on the hoist (x = 0), apex at (triLen, 0.5)
+    const d = (F.triLen * (1 - Math.abs(y - 0.5) * 2) - x) / F.triLen;    // > 0 inside
+    const a = Math.min(1, Math.max(0, 0.5 + d * F.triLen / px));
+    c = c.map((x, i) => x + (F.tri[i] - x) * a);
+  }
+  return c;
+}
 
 // ---------------------------------------------------------------------------
 // Procedural, seamlessly tileable shell texture (color + height)
@@ -311,7 +340,9 @@ function makeShellTextures(patternIn, size = 1024) {
       const n  = fbm(u, v, 4, 4, 5, 11);
       const ns = fbm(u, v, 48, 3, 3, 71);     // streaks along growth lines
       let r = P.base[0], g = P.base[1], b = P.base[2];
-      const tone = 0.82 + 0.36 * n;
+      const flag = P.flag ? FLAGS[P.flag] : null;
+      if (flag) [r, g, b] = flagColor(flag, u, v, 1 / size);
+      const tone = flag ? 0.95 + 0.1 * n : 0.82 + 0.36 * n;   // flags: only a faint shell structure
       r *= tone; g *= tone; b *= tone;
       // spiral color bands
       if (P.bandStrength > 0) {
@@ -354,7 +385,7 @@ function makeShellTextures(patternIn, size = 1024) {
         const m = smooth(0.35, 0.65, val) * P.caStrength;
         r += (P.dark[0] - r) * m; g += (P.dark[1] - g) * m; b += (P.dark[2] - b) * m;
       }
-      const streak = 0.9 + 0.2 * ns;
+      const streak = flag ? 0.97 + 0.06 * ns : 0.9 + 0.2 * ns;
       r *= streak; g *= streak; b *= streak;
       // growth lines (asymmetric increments)
       const gl = frac(u * P.growth + (n - 0.5) * 2.0);
