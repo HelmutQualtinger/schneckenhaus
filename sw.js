@@ -1,6 +1,6 @@
 // Service worker: caches the app shell and the Three.js modules from the CDN,
 // so the installed app also works offline.
-const CACHE = 'schneckenhaus-v1';
+const CACHE = 'schneckenhaus-v2';
 const CORE = [
   './',
   './index.html',

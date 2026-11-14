@@ -495,9 +495,12 @@ function fitView(animated = false) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(orient);
   const sphere = box.getBoundingSphere(new THREE.Sphere());
-  const s = 1.6 / sphere.radius;
+  // narrow (portrait) screens: shrink to fit the width and move up above the bottom panel
+  const narrow = innerWidth <= 640;
+  const s = 1.6 * Math.min(1, camera.aspect / 1.1) * (narrow ? 0.85 : 1) / sphere.radius;
   fitTarget.scale = s;
   fitTarget.pos.copy(sphere.center).multiplyScalar(-s);
+  if (narrow) fitTarget.pos.y += 0.9;
   if (animated) {
     root.scale.setScalar(oldS); root.position.copy(oldP);
     fitTarget.active = true;
@@ -577,6 +580,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  fitView();
 });
 
 document.getElementById('panelToggle').addEventListener('click', () =>
