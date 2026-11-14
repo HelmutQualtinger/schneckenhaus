@@ -96,6 +96,7 @@
     <button data-preset="schnecke">Schnecke</button>
     <button data-preset="nautilus">Tintenfisch</button>
     <button data-preset="muschel">Muschel</button>
+    <button data-preset="ammonit">Ammonit</button>
   </div>
   <div class="ctrl">
     <label>Muster</label>
@@ -167,6 +168,12 @@ const PRESETS = {
     psi: 40, turns: 0.45, T: 0.15,
     bivalve: true, overlap: 1, b: 0.85, ribAmp: 0.022, ribs: 26,
     pattern: 'rippen', inner: { color:0xf6f0ea, iridescence:0.9 }
+  },
+  ammonit: {
+    psi: 5.5, turns: 5, T: 0,
+    bivalve: false, overlap: 1.05, b: 0.8, ribAmp: 0.0, ribs: 0,
+    crossRibs: 30, crossRibAmp: 0.07,          // radial ribs across the whorl (per turn)
+    pattern: 'fossil', inner: { color:0xb9a58c, iridescence:0.6 }
   }
 };
 
@@ -205,7 +212,10 @@ const PATTERNS = {
                 growth:160, growthDark:0.1, bump:1.6 },
   wellen:     { name:'Feine Wellenlinien', base:[214,194,162], mid:[180,150,115], dark:[78,56,40],
                 bands:2, bandStrength:0.3, flames:18, zig:6, zigAmp:1.2, flameLo:0.86, flameHi:0.95, flameStrength:0.9,
-                growth:160, growthDark:0.06, bump:0.7 }
+                growth:160, growthDark:0.06, bump:0.7 },
+  fossil:     { name:'Fossil (Ammonit)', base:[158,132,104], mid:[118,96,74], dark:[84,66,50],
+                bands:1, bandStrength:0.25, flames:3, zigAmp:0.4, flameLo:0.55, flameHi:0.9, flameStrength:0.3,
+                growth:110, growthDark:0.12, growthBump:0.8, bump:1.4 }
 };
 
 // ---------------------------------------------------------------------------
@@ -376,7 +386,7 @@ function buildShellGeometry(p) {
   // then close it in a single point on the coiling axis (the limit point of the log. spiral)
   const theta0 = p.bivalve ? 0 : -Math.min(Math.log(40) / k, 3 * 2 * Math.PI);
   const totalTurns = (thetaLen - theta0) / (2 * Math.PI);
-  const perTurn = p.res ? p.res.perTurn : 180;
+  const perTurn = p.res ? p.res.perTurn : (p.crossRibs ? 360 : 180);
   const nT = p.res ? Math.max(80, Math.ceil(totalTurns * perTurn))
                    : Math.min(2400, Math.max(80, Math.ceil(totalTurns * perTurn)));
   const rows = nT + 2;                               // row 0 = apex point
@@ -399,7 +409,12 @@ function buildShellGeometry(p) {
     const u = th / (2 * Math.PI) * tilesPerTurn;
     for (let j = 0; j <= nS; j++) {
       const s = -Math.PI + 2 * Math.PI * j / nS;    // seam on the inner (columellar) side
-      const rib = 1 + p.ribAmp * Math.cos(p.ribs * s);
+      let rib = 1 + p.ribAmp * Math.cos(p.ribs * s);
+      if (p.crossRibs) {
+        // sharp ribs across the whorl, strongest on the outer flank (s = 0)
+        const c = Math.pow(0.5 + 0.5 * Math.cos(p.crossRibs * th), 4);
+        rib += p.crossRibAmp * c * (0.3 + 0.7 * (0.5 + 0.5 * Math.cos(s)));
+      }
       const rr = R + a * rib * Math.cos(s);
       pos[pi++] = rr * cx;
       pos[pi++] = rr * cy;
@@ -441,6 +456,7 @@ scene.environmentIntensity = 0.7;
 const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
 camera.position.set(3.2, 1.6, 5.2);
 const controls = new OrbitControls(camera, renderer.domElement);
+window.shellApp = { scene, camera, renderer, controls, get root() { return root; } };   // handle for screenshot scripts
 controls.enableDamping = true;
 controls.autoRotate = true;
 controls.autoRotateSpeed = 1.2;
