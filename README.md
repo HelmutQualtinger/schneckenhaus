@@ -1,6 +1,8 @@
 # Schneckenhaus 3D
 
-Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel** und **Nautilus (Tintenfisch)** im Browser, erzeugt mit [Three.js](https://threejs.org) nach dem Raup-Modell der Schalenwindung.
+![Schneckenhaus 3D](assets/social-preview.png)
+
+Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel**, **Nautilus (Tintenfisch)** und **Ammonit** im Browser, erzeugt mit [Three.js](https://threejs.org) nach dem Raup-Modell der Schalenwindung.
 
 **▶ Live-Demo: [helmutqualtinger.github.io/schneckenhaus](https://helmutqualtinger.github.io/schneckenhaus/)**
 
@@ -12,8 +14,8 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel** und **Nautilus (Tint
   - **Öffnungswinkel**: Winkel der logarithmischen Spirale; bestimmt die Erweiterungsrate W = e^(2π·tan ψ) pro Windung
   - **Länge**: Anzahl der Windungen; das Gehäuse wächst an der Mündung, die Spitze bleibt fest
   - **Steigung**: Verschiebung entlang der Windungsachse (0 = flach wie Nautilus, hoch = Turmschnecke)
-- **Drei Grundformen** per Knopfdruck: Schnecke, Tintenfisch (Nautilus), Muschel (zwei gespiegelte Klappen)
-- **10 prozedurale Schalenmuster** mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
+- **Vier Grundformen** per Knopfdruck: Schnecke, Tintenfisch (Nautilus), Muschel (zwei gespiegelte Klappen), Ammonit (flache Spirale mit Querrippen)
+- **11 prozedurale Schalenmuster** mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
 - Scharfe Spitze, perlmuttartig schimmernde Innenseite, Anwachslinien und Rippen als Relief
 - Drehen, Zoomen und Verschieben mit Maus oder Touch
 - **Export als STL** für den 3D-Druck: massiver, wasserdichter Körper mit Muster-Relief und Farben pro Dreieck
@@ -21,16 +23,17 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel** und **Nautilus (Tint
 
 ## Formen
 
-![Schnecke, Nautilus und Muschel](assets/formen.png)
+![Schnecke, Nautilus, Muschel und Ammonit](assets/formen.png)
 
 ## Muster
 
-![Die 10 Schalenmuster](assets/muster.png)
+![Die 11 Schalenmuster](assets/muster.png)
 
 | | | | | |
 |---|---|---|---|---|
 | Zickzack-Flammen | Tigerstreifen (Nautilus) | Herzmuschel-Rippen | Bänderschnecke | Zeltmuster (Kegelschnecke) |
 | Leopardenpunkte | Würfelmuster | Porzellanweiß | Dunkel gerippt | Feine Wellenlinien |
+| Fossil (Ammonit) | | | | |
 
 ![Muster-Auswahl](assets/screenshot-muster.png)
 
@@ -71,8 +74,8 @@ Ansichten lassen sich als Link teilen:
 
 | Parameter | Bedeutung | Beispiel |
 |---|---|---|
-| `preset` | `schnecke`, `nautilus`, `muschel` | `?preset=nautilus` |
-| `pattern` | Muster-Schlüssel (`zickzack`, `tiger`, `rippen`, `baender`, `zelt`, `punkte`, `schach`, `porzellan`, `gerippt`, `wellen`) | `?pattern=zelt` |
+| `preset` | `schnecke`, `nautilus`, `muschel`, `ammonit` | `?preset=nautilus` |
+| `pattern` | Muster-Schlüssel (`zickzack`, `tiger`, `rippen`, `baender`, `zelt`, `punkte`, `schach`, `porzellan`, `gerippt`, `wellen`, `fossil`) | `?pattern=zelt` |
 | `psi`, `turns`, `T` | Öffnungswinkel, Windungen, Steigung | `?psi=7&turns=8&T=3` |
 | `clean` | Bedienfeld ausblenden (für Screenshots) | `?preset=muschel&clean` |
 
