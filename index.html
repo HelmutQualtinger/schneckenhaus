@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Schneckenhaus 3D – Schnecke · Muschel · Nautilus</title>
+<meta name="description" content="Interaktive 3D-Spiralgehäuse von Schnecke, Muschel und Nautilus nach dem Raup-Modell – mit Three.js und 10 prozeduralen Schalenmustern.">
+<meta name="theme-color" content="#1b1916">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Schneckenhaus">
+<!-- Social media preview -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Schneckenhaus 3D">
+<meta property="og:description" content="Spiralgehäuse von Schnecke, Muschel und Nautilus in 3D – Öffnungswinkel, Länge und Steigung live einstellen.">
+<meta property="og:url" content="https://helmutqualtinger.github.io/schneckenhaus/">
+<meta property="og:image" content="https://helmutqualtinger.github.io/schneckenhaus/assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Schneckenhaus 3D">
+<meta name="twitter:description" content="Spiralgehäuse von Schnecke, Muschel und Nautilus in 3D – mit Three.js.">
+<meta name="twitter:image" content="https://helmutqualtinger.github.io/schneckenhaus/assets/social-preview.png">
+<style>
+  :root { --fg:#e9e3d8; --muted:#a39b8e; --accent:#d9a86c; --panel:rgba(22,20,18,0.78); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; font-family: "Helvetica Neue", Arial, sans-serif; color:var(--fg);
+    background: radial-gradient(ellipse at 50% 40%, #3a332c 0%, #1b1916 55%, #0e0d0c 100%); }
+  canvas { display:block; }
+  #panel { position:absolute; top:16px; left:16px; width:300px; padding:16px 18px; background:var(--panel);
+    border:1px solid rgba(255,255,255,0.08); border-radius:10px; backdrop-filter: blur(6px); }
+  h1 { font-size:15px; margin:0 0 12px; font-weight:600; letter-spacing:0.02em; }
+  .presets { display:flex; gap:6px; margin-bottom:14px; }
+  .presets button { flex:1; padding:7px 4px; font-size:12px; color:var(--fg); background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.12); border-radius:6px; cursor:pointer; }
+  .presets button.active { background:var(--accent); color:#1b1916; border-color:var(--accent); font-weight:600; }
+  .ctrl { margin-bottom:12px; }
+  .ctrl label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px; }
+  .ctrl label span { color:var(--accent); font-variant-numeric: tabular-nums; }
+  .pattern-wrap { position:relative; }
+  #patternBtn { display:flex; align-items:center; gap:8px; width:100%; padding:5px; background:#2a2622;
+    border:1px solid rgba(255,255,255,0.15); border-radius:6px; cursor:pointer; }
+  #patternBtn img { width:100%; height:34px; object-fit:cover; border-radius:4px; display:block; }
+  #patternBtn .caret { color:var(--muted); font-size:10px; padding:0 4px; }
+  #patternPopup { display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:10;
+    grid-template-columns:repeat(5, 1fr); gap:6px; padding:8px; background:#1f1c19;
+    border:1px solid rgba(255,255,255,0.15); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,0.5); }
+  #patternPopup.open { display:grid; }
+  #patternPopup img { width:100%; aspect-ratio:1; border-radius:5px; cursor:pointer; display:block;
+    border:2px solid transparent; transition:transform 0.1s; }
+  #patternPopup img:hover { transform:scale(1.08); }
+  #patternPopup img.active { border-color:var(--accent); }
+  input[type=range] { width:100%; accent-color: var(--accent); }
+  #panelToggle { display:none; }
+  body.clean #panel, body.clean #panelToggle { display:none !important; }
+  @media (max-width: 640px) {
+    #panel { top:auto; bottom:calc(10px + env(safe-area-inset-bottom)); left:10px; right:10px; width:auto;
+      max-height:48vh; overflow-y:auto; padding:12px 14px; }
+    #panel.collapsed { display:none; }
+    #panelToggle { display:block; position:absolute; top:calc(12px + env(safe-area-inset-top)); right:12px; z-index:20;
+      width:42px; height:42px; border-radius:50%; border:1px solid rgba(255,255,255,0.15);
+      background:var(--panel); color:var(--fg); font-size:18px; cursor:pointer; }
+  }
+  .info { font-size:11px; color:var(--muted); line-height:1.5; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; }
+  .row { display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; }
+</style>
+</head>
+<body>
+<button id="panelToggle" type="button" aria-label="Einstellungen ein-/ausblenden">⚙︎</button>
+<div id="panel">
+  <h1>Spiral-Gehäuse (Raup-Modell)</h1>
+  <div class="presets">
+    <button data-preset="schnecke">Schnecke</button>
+    <button data-preset="nautilus">Tintenfisch</button>
+    <button data-preset="muschel">Muschel</button>
+  </div>
+  <div class="ctrl">
+    <label>Muster</label>
+    <div class="pattern-wrap">
+      <button id="patternBtn" type="button"><img alt=""><span class="caret">▼</span></button>
+      <div id="patternPopup"></div>
+    </div>
+  </div>
+  <div class="ctrl">
+    <label>Öffnungswinkel der Spirale <span id="vPsi"></span></label>
+    <input id="psi" type="range" min="2" max="45" step="0.1">
+  </div>
+  <div class="ctrl">
+    <label>Länge der Spirale (Windungen) <span id="vTurns"></span></label>
+    <input id="turns" type="range" min="0.2" max="10" step="0.05">
+  </div>
+  <div class="ctrl">
+    <label>Steigung der Spirale <span id="vT"></span></label>
+    <input id="T" type="range" min="0" max="5" step="0.01">
+  </div>
+  <div class="row"><input id="rotate" type="checkbox" checked><label for="rotate">Automatisch drehen</label></div>
+  <div class="info" id="info"></div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ---------------------------------------------------------------------------
+// Presets: geometry parameters + texture palette
+// ---------------------------------------------------------------------------
+const PRESETS = {
+  schnecke: {
+    psi: 9, turns: 6, T: 1.6,
+    bivalve: false, overlap: 1.12, b: 1.0, ribAmp: 0.0, ribs: 0,
+    pattern: 'zickzack', inner: { color:0xe8c7ad, iridescence:0.15 }
+  },
+  nautilus: {
+    psi: 10, turns: 3, T: 0,
+    bivalve: false, overlap: 1.9, b: 0.8, ribAmp: 0.0, ribs: 0,
+    pattern: 'tiger', inner: { color:0xf3ede6, iridescence:1.0 }
+  },
+  muschel: {
+    psi: 40, turns: 0.45, T: 0.15,
+    bivalve: true, overlap: 1, b: 0.85, ribAmp: 0.022, ribs: 26,
+    pattern: 'rippen', inner: { color:0xf6f0ea, iridescence:0.9 }
+  }
+};
+
+// ---------------------------------------------------------------------------
+// 10 texture patterns (all values optional, see PATTERN_DEFAULTS)
+// ---------------------------------------------------------------------------
+const PATTERN_DEFAULTS = {
+  base:[220,200,170], mid:[170,130,90], dark:[90,55,35],
+  bands:0, bandStrength:0, flames:0, zig:0, zigAmp:0, flameLo:0.6, flameHi:0.85, flameStrength:0,
+  growth:150, growthDark:0.12, cords:0, cordDark:0, growthBump:1.0, cordBump:0,
+  spots:0, spotSize:0.3, spotRing:false, checkerU:0, checkerV:0, checkerStrength:0,
+  ca:false, caStrength:0, bump:1.2
+};
+const PATTERNS = {
+  zickzack:   { name:'Zickzack-Flammen', base:[200,164,116], mid:[150,108,66], dark:[84,52,30],
+                bands:3, bandStrength:0.55, flames:9, zig:4, zigAmp:0.6, flameStrength:0.5,
+                growth:170, growthDark:0.16, cords:40, cordDark:0.04, cordBump:0.25, bump:1.2 },
+  tiger:      { name:'Tigerstreifen (Nautilus)', base:[238,228,210], mid:[222,204,176], dark:[136,66,36],
+                flames:11, zig:1, zigAmp:0.7, flameLo:0.5, flameHi:0.68, flameStrength:0.85,
+                growth:140, growthDark:0.07, growthBump:0.8, bump:0.8 },
+  rippen:     { name:'Herzmuschel-Rippen', base:[228,208,176], mid:[196,146,98], dark:[118,68,42],
+                flames:6, flameLo:0.6, flameHi:0.92, flameStrength:0.5,
+                growth:150, growthDark:0.2, cords:26, cordDark:0.22, growthBump:0.9, cordBump:1.0, bump:1.5 },
+  baender:    { name:'Bänderschnecke', base:[228,198,92], mid:[72,42,26], dark:[72,42,26],
+                bands:5, bandStrength:0.92, growth:160, growthDark:0.1, bump:0.9 },
+  zelt:       { name:'Zeltmuster (Kegelschnecke)', base:[242,230,206], dark:[92,52,28],
+                ca:true, caStrength:0.92, growth:200, growthDark:0.06, growthBump:0.5, bump:0.7 },
+  punkte:     { name:'Leopardenpunkte', base:[214,172,116], mid:[160,110,60], dark:[64,36,20],
+                spots:14, spotSize:0.3, spotRing:true, growth:120, growthDark:0.03, growthBump:0.3, bump:0.5 },
+  schach:     { name:'Würfelmuster', base:[236,222,196], dark:[128,52,36],
+                checkerU:14, checkerV:10, checkerStrength:0.85, growth:160, growthDark:0.08, bump:0.8 },
+  porzellan:  { name:'Porzellanweiß', base:[240,230,214], mid:[226,180,166],
+                bands:2, bandStrength:0.45, growth:180, growthDark:0.05, growthBump:0.6, bump:0.6 },
+  gerippt:    { name:'Dunkel gerippt', base:[96,64,44], mid:[70,46,32], dark:[48,30,20],
+                flames:5, flameStrength:0.3, cords:30, cordDark:-0.45, cordBump:1.0,
+                growth:160, growthDark:0.1, bump:1.6 },
+  wellen:     { name:'Feine Wellenlinien', base:[214,194,162], mid:[180,150,115], dark:[78,56,40],
+                bands:2, bandStrength:0.3, flames:18, zig:6, zigAmp:1.2, flameLo:0.86, flameHi:0.95, flameStrength:0.9,
+                growth:160, growthDark:0.06, bump:0.7 }
+};
+
+// ---------------------------------------------------------------------------
+// Procedural, seamlessly tileable shell texture (color + height)
+// ---------------------------------------------------------------------------
+function hash(i, j, seed) {
+  let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(seed, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function vnoise(x, y, Px, Py, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const fx = x - xi, fy = y - yi;
+  const x0 = ((xi % Px) + Px) % Px, x1 = (x0 + 1) % Px;
+  const y0 = ((yi % Py) + Py) % Py, y1 = (y0 + 1) % Py;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const a = hash(x0, y0, seed), b = hash(x1, y0, seed), c = hash(x0, y1, seed), d = hash(x1, y1, seed);
+  return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
+}
+// periodic fbm on the unit square; fu/fv = integer base frequencies
+function fbm(u, v, fu, fv, oct, seed) {
+  let sum = 0, amp = 0.5, norm = 0;
+  for (let o = 0; o < oct; o++) {
+    const m = 1 << o;
+    sum += amp * vnoise(u * fu * m, v * fv * m, fu * m, fv * m, seed + o * 17);
+    norm += amp; amp *= 0.5;
+  }
+  return sum / norm;
+}
+const frac = x => x - Math.floor(x);
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+// Rule-30 cellular automaton: rows = growth steps (u), cells = mantle edge (v), periodic in v.
+// Produces the triangle ("tent") pattern of cone shells.
+function makeCA(cells, steps, seed) {
+  const g = new Uint8Array(cells * steps);
+  for (let c = 0; c < cells; c++) g[c] = hash(c, 7, seed) < 0.5 ? 1 : 0;
+  for (let t = 1; t < steps; t++) {
+    for (let c = 0; c < cells; c++) {
+      const l = g[(t - 1) * cells + (c - 1 + cells) % cells], m = g[(t - 1) * cells + c], r = g[(t - 1) * cells + (c + 1) % cells];
+      g[t * cells + c] = l ^ (m | r);
+    }
+  }
+  return g;
+}
+// periodic Worley distance (nearest jittered point) on an N x N grid
+function worley(u, v, N, seed) {
+  const x = u * N, y = v * N, xi = Math.floor(x), yi = Math.floor(y);
+  let best = 9;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const cx = xi + dx, cy = yi + dy;
+    const wx = ((cx % N) + N) % N, wy = ((cy % N) + N) % N;
+    const px = cx + 0.2 + 0.6 * hash(wx, wy, seed), py = cy + 0.2 + 0.6 * hash(wx, wy, seed + 1);
+    const d = Math.hypot(px - x, py - y);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function makeShellTextures(patternIn, size = 1024) {
+  const P = { ...PATTERN_DEFAULTS, ...patternIn };
+  const CA_CELLS = 160, CA_STEPS = 220;
+  const caGrid = P.ca ? makeCA(CA_CELLS, CA_STEPS, 5) : null;
+  const cC = document.createElement('canvas'), cH = document.createElement('canvas');
+  cC.width = cC.height = cH.width = cH.height = size;
+  const ctxC = cC.getContext('2d'), ctxH = cH.getContext('2d');
+  const imgC = ctxC.createImageData(size, size), imgH = ctxH.createImageData(size, size);
+  const TAU = Math.PI * 2;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;                       // around the tube (spiral direction = constant v)
+    for (let x = 0; x < size; x++) {
+      const u = x / size;                     // along growth direction (growth lines = constant u)
+      const n  = fbm(u, v, 4, 4, 5, 11);
+      const ns = fbm(u, v, 48, 3, 3, 71);     // streaks along growth lines
+      let r = P.base[0], g = P.base[1], b = P.base[2];
+      const tone = 0.82 + 0.36 * n;
+      r *= tone; g *= tone; b *= tone;
+      // spiral color bands
+      if (P.bandStrength > 0) {
+        const bv = 0.5 + 0.5 * Math.sin(TAU * (v * P.bands + 0.25 * (n - 0.5)));
+        const m = smooth(0.55, 0.8, bv) * P.bandStrength;
+        r += (P.mid[0] - r) * m; g += (P.mid[1] - g) * m; b += (P.mid[2] - b) * m;
+      }
+      // flames / zig-zag stripes parallel to growth lines
+      if (P.flameStrength > 0) {
+        const zig = Math.abs(frac(v * P.zig) - 0.5) * 2;
+        const ph = u * P.flames + zig * P.zigAmp + (n - 0.5) * 0.9 + (ns - 0.5) * 0.15;
+        const f = 0.5 + 0.5 * Math.sin(TAU * ph);
+        const m = smooth(P.flameLo, P.flameHi, f) * P.flameStrength;
+        r += (P.dark[0] - r) * m; g += (P.dark[1] - g) * m; b += (P.dark[2] - b) * m;
+      }
+      // spots (optionally with a lighter halo)
+      if (P.spots > 0) {
+        const d = worley(u + (n - 0.5) * 0.02, v, P.spots, 31);
+        const m = 1 - smooth(P.spotSize * 0.75, P.spotSize, d);
+        if (P.spotRing) {
+          const halo = (1 - smooth(P.spotSize, P.spotSize * 1.35, d)) * 0.6;
+          r += (P.mid[0] * 1.25 - r) * halo * (1 - m); g += (P.mid[1] * 1.25 - g) * halo * (1 - m); b += (P.mid[2] * 1.25 - b) * halo * (1 - m);
+        }
+        r += (P.dark[0] - r) * m; g += (P.dark[1] - g) * m; b += (P.dark[2] - b) * m;
+      }
+      // checker / tessellated squares
+      if (P.checkerStrength > 0) {
+        const cu = Math.floor(u * P.checkerU + (n - 0.5) * 0.35), cv = Math.floor(v * P.checkerV + (ns - 0.5) * 0.25);
+        const m = (((cu + cv) % 2) + 2) % 2 * P.checkerStrength * (0.85 + 0.3 * (n - 0.5));
+        r += (P.dark[0] - r) * m; g += (P.dark[1] - g) * m; b += (P.dark[2] - b) * m;
+      }
+      // cellular automaton (cone-shell tents), bilinear sampled
+      if (caGrid) {
+        const fx = u * (CA_STEPS - 1), fy = v * CA_CELLS;
+        const t0 = Math.floor(fx), c0 = Math.floor(fy) % CA_CELLS;
+        const t1 = Math.min(CA_STEPS - 1, t0 + 1), c1 = (c0 + 1) % CA_CELLS;
+        const ax = fx - t0, ay = fy - Math.floor(fy);
+        const val = (caGrid[t0 * CA_CELLS + c0] * (1 - ax) + caGrid[t1 * CA_CELLS + c0] * ax) * (1 - ay)
+                  + (caGrid[t0 * CA_CELLS + c1] * (1 - ax) + caGrid[t1 * CA_CELLS + c1] * ax) * ay;
+        const m = smooth(0.35, 0.65, val) * P.caStrength;
+        r += (P.dark[0] - r) * m; g += (P.dark[1] - g) * m; b += (P.dark[2] - b) * m;
+      }
+      const streak = 0.9 + 0.2 * ns;
+      r *= streak; g *= streak; b *= streak;
+      // growth lines (asymmetric increments)
+      const gl = frac(u * P.growth + (n - 0.5) * 2.0);
+      const line = smooth(0.8, 1.0, gl);
+      const fine = smooth(0.7, 1.0, frac(u * P.growth * 3.0 + (ns - 0.5) * 1.5));
+      const gd = 1 - P.growthDark * line - 0.06 * fine;
+      // spiral cords / radial ribs
+      const cord = P.cords > 0 ? 0.5 + 0.5 * Math.cos(TAU * v * P.cords) : 0.5;
+      const cd = 1 - P.cordDark * (1 - cord);
+      r *= gd * cd; g *= gd * cd; b *= gd * cd;
+
+      const i = (y * size + x) * 4;
+      imgC.data[i] = Math.min(255, r); imgC.data[i + 1] = Math.min(255, g); imgC.data[i + 2] = Math.min(255, b); imgC.data[i + 3] = 255;
+      let h = 0.35 + 0.35 * line * P.growthBump + 0.1 * fine * P.growthBump + (cord - 0.5) * 0.5 * P.cordBump + 0.15 * (n - 0.5) + 0.1 * (ns - 0.5);
+      h = Math.min(255, Math.max(0, h * 255));
+      imgH.data[i] = imgH.data[i + 1] = imgH.data[i + 2] = h; imgH.data[i + 3] = 255;
+    }
+  }
+  ctxC.putImageData(imgC, 0, 0); ctxH.putImageData(imgH, 0, 0);
+  const map = new THREE.CanvasTexture(cC), bump = new THREE.CanvasTexture(cH);
+  for (const t of [map, bump]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+  }
+  map.colorSpace = THREE.SRGBColorSpace;
+  return { map, bump };
+}
+
+// ---------------------------------------------------------------------------
+// Shell geometry: logarithmic helico-spiral (Raup's coiling model)
+//   psi   – Öffnungswinkel: angle of the log. spiral -> expansion rate W = e^(2π tan psi)
+//   turns – Länge: number of whorls
+//   T     – Steigung: translation along the coiling axis per unit radius
+// ---------------------------------------------------------------------------
+function buildShellGeometry(p) {
+  const k = Math.tan(p.psi * Math.PI / 180);
+  const W = Math.exp(2 * Math.PI * k);
+  const thetaLen = p.turns * 2 * Math.PI;
+  const T = p.T, b = p.b;
+
+  let ratio; // tube radius / distance of tube center from axis
+  if (p.bivalve) ratio = 1.0;
+  else {
+    ratio = (1 - 1 / W) * Math.sqrt(1 + T * T) / (1 + 1 / W) * p.overlap;
+    ratio = Math.min(1.0, Math.max(0.04, ratio));
+  }
+
+  // sharp apex: continue the spiral backwards (hidden early whorls) until the tube is tiny,
+  // then close it in a single point on the coiling axis (the limit point of the log. spiral)
+  const theta0 = p.bivalve ? 0 : -Math.min(Math.log(40) / k, 3 * 2 * Math.PI);
+  const totalTurns = (thetaLen - theta0) / (2 * Math.PI);
+  const nT = Math.min(2400, Math.max(80, Math.ceil(totalTurns * 180)));
+  const rows = nT + 2;                               // row 0 = apex point
+  const nS = 128;
+  const speed = Math.sqrt(1 + k * k + (T * k) * (T * k));
+  const tilesPerTurn = speed / (ratio * (1 + b) / 2);   // keeps texture texels roughly square
+
+  const pos = new Float32Array(rows * (nS + 1) * 3);
+  const uv  = new Float32Array(rows * (nS + 1) * 2);
+  let pi = 0, ui = 0;
+  for (let i = 0; i < rows; i++) {
+    const apex = i === 0;
+    const th = apex ? theta0 : theta0 + (thetaLen - theta0) * (i - 1) / nT;   // growth from apex to aperture
+    const R = apex ? 0 : Math.exp(k * th);
+    const a = ratio * R;
+    const cx = Math.cos(th), cy = Math.sin(th);
+    const cz = p.bivalve ? T * R : -T * R;
+    const u = th / (2 * Math.PI) * tilesPerTurn;
+    for (let j = 0; j <= nS; j++) {
+      const s = -Math.PI + 2 * Math.PI * j / nS;    // seam on the inner (columellar) side
+      const rib = 1 + p.ribAmp * Math.cos(p.ribs * s);
+      const rr = R + a * rib * Math.cos(s);
+      pos[pi++] = rr * cx;
+      pos[pi++] = rr * cy;
+      pos[pi++] = cz + a * rib * b * Math.sin(s);
+      uv[ui++] = u;
+      uv[ui++] = j / nS;
+    }
+  }
+  const idx = [];
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < nS; j++) {
+      const a0 = i * (nS + 1) + j, a1 = (i + 1) * (nS + 1) + j;
+      idx.push(a0, a1, a1 + 1, a0, a1 + 1, a0 + 1);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return { geo, W, ratio };
+}
+
+// ---------------------------------------------------------------------------
+// Scene
+// ---------------------------------------------------------------------------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.7;
+
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
+camera.position.set(3.2, 1.6, 5.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 1.2;
+
+const key = new THREE.DirectionalLight(0xfff1dc, 2.2);
+key.position.set(4, 6, 5);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfd4ff, 0.9);
+rim.position.set(-5, 2, -4);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xfff6ea, 0x2a2420, 0.4));
+
+const outerMat = new THREE.MeshPhysicalMaterial({
+  roughness: 0.42, clearcoat: 0.55, clearcoatRoughness: 0.35, sheen: 0.2, side: THREE.FrontSide
+});
+const innerMat = new THREE.MeshPhysicalMaterial({
+  roughness: 0.12, clearcoat: 1.0, clearcoatRoughness: 0.05,
+  iridescenceIOR: 1.6, iridescenceThicknessRange: [180, 620], side: THREE.BackSide
+});
+
+const root = new THREE.Group();     // fitting (scale / position)
+const orient = new THREE.Group();   // orientation of the coiling axis
+root.add(orient);
+scene.add(root);
+
+let currentPreset = 'schnecke';
+let params = { ...PRESETS.schnecke };
+let geo = null;
+
+const thumbs = {};
+let currentPattern = null;
+const textureCache = {};   // generated textures per pattern (generation takes a moment)
+function applyPattern(key) {
+  const P = PATTERNS[key];
+  if (!textureCache[key]) textureCache[key] = makeShellTextures(P);
+  const { map, bump } = textureCache[key];
+  outerMat.map = map;
+  outerMat.bumpMap = bump;
+  outerMat.bumpScale = P.bump ?? PATTERN_DEFAULTS.bump;
+  outerMat.needsUpdate = true;
+  currentPattern = key;
+  if (thumbs[key]) patternBtnImg.src = thumbs[key];
+  patternPopup.querySelectorAll('img').forEach(im => im.classList.toggle('active', im.dataset.key === key));
+}
+function applyInner(presetName) {
+  const P = PRESETS[presetName];
+  innerMat.color.setHex(P.inner.color);
+  innerMat.iridescence = P.inner.iridescence;
+  innerMat.needsUpdate = true;
+}
+
+function rebuild(refit = true) {
+  while (orient.children.length) orient.remove(orient.children[0]);
+  if (geo) geo.dispose();
+  const res = buildShellGeometry(params);
+  geo = res.geo;
+
+  const thetaLen = params.turns * 2 * Math.PI;
+  const makeValve = () => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(geo, outerMat), new THREE.Mesh(geo, innerMat));
+    return g;
+  };
+
+  if (params.bivalve) {
+    // two mirrored valves, hinged at the coiling axis (z), slightly opened
+    const open = 0.07;
+    // rotate so the margin (aperture) lies in the commissure plane y = 0; the umbo stays at the hinge
+    const v1 = makeValve(); v1.rotation.z = -thetaLen - open;
+    const v2wrap = new THREE.Group(); v2wrap.scale.y = -1;
+    const v2 = makeValve(); v2.rotation.z = -thetaLen - open;
+    v2wrap.add(v2);
+    orient.add(v1, v2wrap);
+    orient.rotation.set(0, 0, 0);              // commissure plane horizontal
+  } else {
+    orient.add(makeValve());
+    // planispiral (no translation): show the spiral side; otherwise coiling axis vertical, apex up
+    if (params.T < 0.05) orient.rotation.set(0, 0, 0);
+    else orient.rotation.set(-Math.PI / 2, 0, 0);
+  }
+
+  // fit into view (not when only the length changes: apex stays fixed, shell grows at the aperture)
+  if (refit) fitView();
+  showInfo(res);
+}
+
+// fit target; animated = smooth transition (used after the length slider is released)
+const fitTarget = { scale: 1, pos: new THREE.Vector3(), active: false };
+function fitView(animated = false) {
+  const oldS = root.scale.x, oldP = root.position.clone();
+  root.scale.setScalar(1); root.position.set(0, 0, 0);
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(orient);
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  const s = 1.6 / sphere.radius;
+  fitTarget.scale = s;
+  fitTarget.pos.copy(sphere.center).multiplyScalar(-s);
+  if (animated) {
+    root.scale.setScalar(oldS); root.position.copy(oldP);
+    fitTarget.active = true;
+  } else {
+    root.scale.setScalar(s); root.position.copy(fitTarget.pos);
+    fitTarget.active = false;
+  }
+}
+function updateFit() {
+  if (!fitTarget.active) return;
+  const t = 0.12;
+  // interpolate scale logarithmically (sizes differ by orders of magnitude)
+  const ls = Math.log(root.scale.x), lt = Math.log(fitTarget.scale);
+  root.scale.setScalar(Math.exp(ls + (lt - ls) * t));
+  root.position.lerp(fitTarget.pos, t);
+  if (Math.abs(lt - ls) < 1e-3 && root.position.distanceTo(fitTarget.pos) < 1e-3) {
+    root.scale.setScalar(fitTarget.scale); root.position.copy(fitTarget.pos);
+    fitTarget.active = false;
+  }
+}
+
+function showInfo(res) {
+  document.getElementById('info').innerHTML =
+    `Erweiterungsrate W = ${res.W < 1000 ? res.W.toFixed(2) : res.W.toExponential(1)} pro Windung<br>` +
+    `Röhrenverhältnis a/R = ${res.ratio.toFixed(2)}<br>` +
+    `Maus: Drehen · Mausrad: Zoom · Rechte Taste: Verschieben`;
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+// pattern picker: popup with thumbnail swatches (small, fast texture renders)
+const patternBtn = document.getElementById('patternBtn');
+const patternBtnImg = patternBtn.querySelector('img');
+const patternPopup = document.getElementById('patternPopup');
+for (const [key, P] of Object.entries(PATTERNS)) {
+  const { map, bump } = makeShellTextures({ ...P, growth: (P.growth ?? 150) * 0.25 }, 128);
+  thumbs[key] = map.image.toDataURL();
+  map.dispose(); bump.dispose();
+  const img = new Image();
+  img.src = thumbs[key]; img.dataset.key = key; img.title = P.name;
+  img.addEventListener('click', () => { applyPattern(key); patternPopup.classList.remove('open'); });
+  patternPopup.appendChild(img);
+}
+patternBtn.addEventListener('click', e => { e.stopPropagation(); patternPopup.classList.toggle('open'); });
+document.addEventListener('click', e => { if (!patternPopup.contains(e.target)) patternPopup.classList.remove('open'); });
+const elPsi = document.getElementById('psi'), elTurns = document.getElementById('turns'), elT = document.getElementById('T');
+function syncLabels() {
+  document.getElementById('vPsi').textContent = (+params.psi).toFixed(1) + '°';
+  document.getElementById('vTurns').textContent = (+params.turns).toFixed(2);
+  document.getElementById('vT').textContent = (+params.T).toFixed(2);
+}
+function loadPreset(name) {
+  currentPreset = name;
+  params = { ...PRESETS[name] };
+  elPsi.value = params.psi; elTurns.value = params.turns; elT.value = params.T;
+  document.querySelectorAll('.presets button').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+  applyPattern(params.pattern);
+  applyInner(name);
+  syncLabels();
+  rebuild();
+}
+let pending = false, refitPending = false;
+function onSlider(e) {
+  if (e.target !== elTurns) refitPending = true;
+  params.psi = +elPsi.value; params.turns = +elTurns.value; params.T = +elT.value;
+  syncLabels();
+  if (!pending) { pending = true; requestAnimationFrame(() => { pending = false; rebuild(refitPending); refitPending = false; }); }
+}
+[elPsi, elTurns, elT].forEach(el => el.addEventListener('input', onSlider));
+// length slider released -> smoothly zoom to the whole shell
+elTurns.addEventListener('change', () => requestAnimationFrame(() => fitView(true)));
+document.querySelectorAll('.presets button').forEach(b => b.addEventListener('click', () => loadPreset(b.dataset.preset)));
+document.getElementById('rotate').addEventListener('change', e => controls.autoRotate = e.target.checked);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('panelToggle').addEventListener('click', () =>
+  document.getElementById('panel').classList.toggle('collapsed'));
+
+// URL parameters: ?preset=nautilus&pattern=zelt&psi=..&turns=..&T=..&clean (clean = hide UI)
+const q = new URLSearchParams(location.search);
+loadPreset(PRESETS[q.get('preset')] ? q.get('preset') : 'schnecke');
+if (PATTERNS[q.get('pattern')]) applyPattern(q.get('pattern'));
+let qChanged = false;
+for (const [id, el] of [['psi', elPsi], ['turns', elTurns], ['T', elT]]) {
+  if (q.has(id)) { el.value = q.get(id); qChanged = true; }
+}
+if (qChanged) onSlider({ target: elPsi });
+if (q.has('clean')) { document.body.classList.add('clean'); controls.autoRotate = false; }
+
+// offline support / installable app (PWA)
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+renderer.setAnimationLoop(() => { updateFit(); controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>
