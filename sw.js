@@ -1,6 +1,6 @@
 // Service worker: caches the app shell and the Three.js modules from the CDN,
 // so the installed app also works offline.
-const CACHE = 'schneckenhaus-v6';
+const CACHE = 'schneckenhaus-v7';
 const CORE = [
   './',
   './index.html',
@@ -27,6 +27,8 @@ self.addEventListener('activate', e => {
 // network first for the page itself (updates arrive), cache first for everything else
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // visitor counting (GoatCounter) always goes to the network, never into the cache
+  if (/(^|\.)(goatcounter\.com|zgo\.at)$/.test(new URL(e.request.url).hostname)) return;
   const isPage = e.request.mode === 'navigate';
   if (isPage) {
     e.respondWith(
