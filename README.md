@@ -49,7 +49,7 @@ Die Anwendung ist eine Progressive Web App. Sie wird direkt aus dem Browser inst
 
 Die App startet danach im Vollbild mit eigenem Icon. Beim ersten Start werden alle Dateien zwischengespeichert, danach läuft sie auch ohne Internetverbindung.
 
-Auf dem Smartphone blendet das Zahnrad oben rechts die Einstellungen ein und aus.
+Das Bedienfeld lässt sich an der Titelleiste verschieben und mit – minimieren (oder per Doppelklick auf die Titelleiste). Position und Zustand bleiben gespeichert.
 
 ## URL-Parameter
 
