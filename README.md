@@ -16,6 +16,7 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel** und **Nautilus (Tint
 - **10 prozedurale Schalenmuster** mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
 - Scharfe Spitze, perlmuttartig schimmernde Innenseite, Anwachslinien und Rippen als Relief
 - Drehen, Zoomen und Verschieben mit Maus oder Touch
+- **Export als STL** für den 3D-Druck: massiver, wasserdichter Körper mit Muster-Relief und Farben pro Dreieck
 - **Als App installierbar** auf iOS und Android (Progressive Web App), funktioniert danach auch offline
 
 ## Formen
@@ -32,6 +33,19 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel** und **Nautilus (Tint
 | Leopardenpunkte | Würfelmuster | Porzellanweiß | Dunkel gerippt | Feine Wellenlinien |
 
 ![Muster-Auswahl](assets/screenshot-muster.png)
+
+## Export als STL (3D-Druck)
+
+Im Bedienfeld unter **Export als STL** lässt sich die aktuelle Form mit dem gewählten Muster als binäre STL-Datei herunterladen.
+
+| Einstellung | Bedeutung |
+|---|---|
+| Größe (mm) | längste Kante des Modells |
+| Wandstärke (mm) | Dicke der Schale; zur Spitze hin automatisch dünner, damit sich die Röhre nicht selbst durchdringt |
+| Relieftiefe (mm) | wie stark das Muster (Anwachslinien, Rippen) als Relief nach außen ausgeprägt wird |
+| Auflösung | Entwurf (ca. 0,4 Mio. Dreiecke), Standard (ca. 1,4 Mio.), Fein (ca. 3,5 Mio.) für die Schnecke mit 6 Windungen |
+
+Die Datei ist ein geschlossener, wasserdichter Körper (Außenfläche, Innenfläche, Mündungsrand) in Millimetern mit Z nach oben, auf z = 0 gestellt. Die Musterfarben stehen pro Dreieck in der Datei (Materialise-Farbformat). Programme wie Materialise Magics, MeshLab oder der Three.js-STLLoader zeigen sie an; die meisten Slicer ignorieren sie und lesen nur die Form. Bei der Muschel enthält die Datei beide Klappen.
 
 ## App auf iOS und Android installieren
 
