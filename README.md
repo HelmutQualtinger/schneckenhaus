@@ -18,7 +18,7 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel**, **Nautilus (Tintenf
 - **11 prozedurale Schalenmuster** mit Farb- und Reliefkarte, wählbar über eine Vorschau-Palette
 - Scharfe Spitze, perlmuttartig schimmernde Innenseite, Anwachslinien und Rippen als Relief
 - Drehen, Zoomen und Verschieben mit Maus oder Touch
-- **Export als STL** für den 3D-Druck: massiver, wasserdichter Körper mit Muster-Relief und Farben pro Dreieck
+- **Export als 3MF, OBJ, GLB oder STL** für 3D-Druck und 3D-Programme: massiver, wasserdichter Körper mit Muster-Relief und Bildtextur
 - **Als App installierbar** auf iOS und Android (Progressive Web App), funktioniert danach auch offline
 
 ## Formen
@@ -37,9 +37,16 @@ Interaktive 3D-Spiralgehäuse von **Schnecke**, **Muschel**, **Nautilus (Tintenf
 
 ![Muster-Auswahl](assets/screenshot-muster.png)
 
-## Export als STL (3D-Druck)
+## Export (3D-Druck und 3D-Programme)
 
-Im Bedienfeld unter **Export als STL** lässt sich die aktuelle Form mit dem gewählten Muster als binäre STL-Datei herunterladen.
+Im Bedienfeld unter **Export** lässt sich die aktuelle Form mit dem gewählten Muster herunterladen. Alle Formate enthalten denselben massiven, wasserdichten Körper (Außenfläche mit Muster-Relief, Innenfläche, Mündungsrand).
+
+| Format | Textur | Einheit / Achse | Geeignet für |
+|---|---|---|---|
+| **3MF** | Bildtextur (3MF-Materials-Erweiterung) + Farbe innen | mm, Z oben | 3D-Druck, Windows 3D Viewer; Slicer übernehmen mindestens die Form |
+| **OBJ** (ZIP mit `.obj`, `.mtl`, `.png`) | Bildtextur | mm, Z oben | Blender, Bambu Studio, die meisten 3D-Programme |
+| **GLB** | Bildtextur eingebettet | m, Y oben (glTF-Standard) | Blender, Web, AR, macOS-Vorschau |
+| **STL** | keine Bildtextur: Relief + Farbe pro Dreieck (Materialise-Format) | mm, Z oben | jeder Slicer (nur Form) |
 
 | Einstellung | Bedeutung |
 |---|---|
@@ -48,7 +55,7 @@ Im Bedienfeld unter **Export als STL** lässt sich die aktuelle Form mit dem gew
 | Relieftiefe (mm) | wie stark das Muster (Anwachslinien, Rippen) als Relief nach außen ausgeprägt wird |
 | Auflösung | Entwurf (ca. 0,4 Mio. Dreiecke), Standard (ca. 1,4 Mio.), Fein (ca. 3,5 Mio.) für die Schnecke mit 6 Windungen |
 
-Die Datei ist ein geschlossener, wasserdichter Körper (Außenfläche, Innenfläche, Mündungsrand) in Millimetern mit Z nach oben, auf z = 0 gestellt. Die Musterfarben stehen pro Dreieck in der Datei (Materialise-Farbformat). Programme wie Materialise Magics, MeshLab oder der Three.js-STLLoader zeigen sie an; die meisten Slicer ignorieren sie und lesen nur die Form. Bei der Muschel enthält die Datei beide Klappen.
+Die Textur ist die nahtlos kachelbare Musterkachel (1024 × 1024 PNG); die Texturkoordinaten wiederholen sie entlang der Spirale. Bei der Muschel enthält die Datei beide Klappen.
 
 ## App auf iOS und Android installieren
 

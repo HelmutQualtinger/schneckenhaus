@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Schneckenhaus 3D – Schnecke · Muschel · Nautilus</title>
-<meta name="description" content="Interaktive 3D-Spiralgehäuse von Schnecke, Muschel, Nautilus und Ammonit nach dem Raup-Modell – mit Three.js, 11 Schalenmustern und STL-Export.">
+<meta name="description" content="Interaktive 3D-Spiralgehäuse von Schnecke, Muschel, Nautilus und Ammonit nach dem Raup-Modell – mit Three.js, 11 Schalenmustern und Export als 3MF, OBJ, GLB und STL.">
 <meta name="theme-color" content="#1b1916">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png">
@@ -78,9 +78,9 @@
   .egrid { display:grid; grid-template-columns:1fr 84px; gap:6px 8px; align-items:center; font-size:12px; }
   .egrid input, .egrid select { width:100%; padding:4px 6px; font-size:12px; color:var(--fg); background:#2a2622;
     border:1px solid rgba(255,255,255,0.15); border-radius:5px; }
-  #stlBtn { width:100%; margin-top:10px; padding:8px; font-size:12px; font-weight:600; color:#1b1916;
+  #exportBtn { width:100%; margin-top:10px; padding:8px; font-size:12px; font-weight:600; color:#1b1916;
     background:var(--accent); border:none; border-radius:6px; cursor:pointer; }
-  #stlBtn:disabled { opacity:0.6; cursor:wait; }
+  #exportBtn:disabled { opacity:0.6; cursor:wait; }
   .ehint { font-size:11px; color:var(--muted); margin-top:6px; line-height:1.4; }
 </style>
 </head>
@@ -119,8 +119,15 @@
   </div>
   <div class="row"><input id="rotate" type="checkbox" checked><label for="rotate">Automatisch drehen</label></div>
   <details class="export">
-    <summary>Export als STL (3D-Druck)</summary>
+    <summary>Export (3D-Druck / 3D-Programme)</summary>
     <div class="egrid">
+      <label for="exportFormat">Format</label>
+      <select id="exportFormat">
+        <option value="3mf" selected>3MF</option>
+        <option value="obj">OBJ (ZIP)</option>
+        <option value="glb">GLB</option>
+        <option value="stl">STL</option>
+      </select>
       <label for="stlSize">Größe (mm)</label><input id="stlSize" type="number" min="10" max="500" step="5" value="80">
       <label for="stlWall">Wandstärke (mm)</label><input id="stlWall" type="number" min="0.4" max="10" step="0.1" value="1.2">
       <label for="stlRelief">Relieftiefe (mm)</label><input id="stlRelief" type="number" min="0" max="3" step="0.05" value="0.4">
@@ -131,8 +138,8 @@
         <option value="fine">Fein</option>
       </select>
     </div>
-    <button id="stlBtn" type="button">STL herunterladen</button>
-    <div class="ehint" id="stlHint">Massiver Körper mit Wandstärke, Muster als Relief, Farben pro Dreieck (Materialise-Format).</div>
+    <button id="exportBtn" type="button">3MF herunterladen</button>
+    <div class="ehint" id="exportHint"></div>
   </details>
   <div class="info" id="info"></div>
   </div>
@@ -640,11 +647,15 @@ addEventListener('resize', () => {
 });
 
 // ---------------------------------------------------------------------------
-// STL export: closed solid (outer surface with texture relief, inner surface offset by the
-// wall thickness, rim at the aperture), per-facet colours from the texture (Materialise Magics
-// convention: "COLOR=" in the header, 15-bit colour in the attribute bytes), millimetres, Z up.
+// Export for 3D printing / 3D software. All formats share one closed solid:
+// outer surface (displaced by the relief map), inner surface (offset by the wall thickness),
+// rim at the aperture. Formats:
+//   3MF – mm, Z up, image texture (3MF materials extension) + base colour inside
+//   OBJ – ZIP with .obj/.mtl/.png, mm, Z up, image texture
+//   GLB – glTF binary, metres, Y up, texture embedded
+//   STL – mm, Z up, relief + per-facet colours (Materialise convention)
 // ---------------------------------------------------------------------------
-const STL_RES = {
+const EXPORT_RES = {
   draft:    { perTurn: 120, around: 96 },
   standard: { perTurn: 240, around: 160 },
   fine:     { perTurn: 400, around: 256 }
@@ -664,182 +675,410 @@ function imageSampler(canvas, blurPx = 0) {
   }
   const d = src.getContext('2d').getImageData(0, 0, w, h).data;
   const wrap = (x, n) => ((x % n) + n) % n;
+  // (u, v) in texture space as rendered (v = 0 at the bottom row, like three.js with flipY)
   return {
-    // bilinear, red channel, 0..1
     height(u, v) {
-      const x = wrap(u * w - 0.5, w), y = wrap(v * h - 0.5, h);
+      const x = wrap(u * w - 0.5, w), y = wrap((1 - v) * h - 0.5, h);
       const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
       const x1 = (x0 + 1) % w, y1 = (y0 + 1) % h;
       const p = (xx, yy) => d[(yy * w + xx) * 4];
       return ((p(x0, y0) * (1 - fx) + p(x1, y0) * fx) * (1 - fy) + (p(x0, y1) * (1 - fx) + p(x1, y1) * fx) * fy) / 255;
     },
     rgb(u, v) {
-      const i = (Math.floor(wrap(v * h, h)) * w + Math.floor(wrap(u * w, w))) * 4;
+      const i = (Math.floor(wrap((1 - v) * h, h)) * w + Math.floor(wrap(u * w, w))) * 4;
       return [d[i], d[i + 1], d[i + 2]];
     }
   };
 }
 
-// Materialise Magics colour convention: bit 15 = 0 -> facet has its own colour, red in the low bits
-const rgb15 = (r, g, b) => ((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3);
-
-function buildSTL({ sizeMM, wallMM, reliefMM, quality }) {
-  const res = STL_RES[quality] || STL_RES.standard;
-  const shell = buildShellGeometry({ ...params, res });
-  const { geo: g, rows, nS, tubeA } = shell;
-  const cols = nS + 1;
-  const P = g.attributes.position.array, N = g.attributes.normal.array, UV = g.attributes.uv.array;
-  // identical normals on the seam column
-  for (let i = 0; i < rows; i++) {
+// Builds the solid. Vertices are addressed by "grid index": per valve, outer grid [0, nv) and
+// inner grid [nv, 2nv). Returns positions in mm (Z up, centred, standing on z = 0) and
+// in three.js space (Y up, metres) for glTF.
+function buildSolid({ sizeMM, wallMM, reliefMM, quality }) {
+  const res = EXPORT_RES[quality] || EXPORT_RES.standard;
+  const { geo: g, rows, nS, tubeA } = buildShellGeometry({ ...params, res });
+  const cols = nS + 1, nv = rows * cols;
+  const P = g.attributes.position.array, N = g.attributes.normal.array, UV = g.attributes.uv.array.slice();
+  g.dispose();
+  for (let i = 0; i < rows; i++) {                         // identical normals on the seam column
     const a = i * cols * 3, b = (i * cols + nS) * 3;
     for (let c = 0; c < 3; c++) { const m = (N[a + c] + N[b + c]) / 2; N[a + c] = N[b + c] = m; }
   }
 
-  // samplers; blur the height map to the mesh resolution to avoid aliasing
   const tex = textureCache[currentPattern];
   const texSize = tex.map.image.width;
-  const tiles = (UV[(rows - 1) * cols * 2] - UV[cols * 2]) / Math.max(1e-6, rows - 2);   // u per row
-  const blur = Math.max(0, Math.min(8, 0.5 * Math.max(tiles * texSize, texSize / nS)));
-  const hS = imageSampler(tex.bump.image, blur), cS = imageSampler(tex.map.image, blur);   // colour averaged per facet
+  const uPerRow = (UV[(rows - 1) * cols * 2] - UV[cols * 2]) / Math.max(1e-6, rows - 2);
+  const blur = Math.max(0, Math.min(8, 0.5 * Math.max(uPerRow * texSize, texSize / nS)));
+  const hS = imageSampler(tex.bump.image, blur);
 
-  // valve transforms relative to the fitted root (includes orientation / mirroring)
   root.updateMatrixWorld(true);
   const rootInv = root.matrixWorld.clone().invert();
   const mats = [];
   orient.traverse(o => { if (o.isMesh && o.material === outerMat) mats.push(rootInv.clone().multiply(o.matrixWorld)); });
 
-  // scale to mm from the bounding box of the undisplaced shell
   const box = new THREE.Box3(), v = new THREE.Vector3();
   for (const m of mats) for (let i = 0; i < P.length; i += 3) box.expandByPoint(v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(m));
   const dims = box.getSize(new THREE.Vector3());
   const scale = sizeMM / Math.max(dims.x, dims.y, dims.z);
   const wall = wallMM / scale, relief = reliefMM / scale;
 
-  // displaced outer and offset inner vertex grids (local shell space)
-  const nv = rows * cols;
+  // local grids
   const O = new Float32Array(nv * 3), I = new Float32Array(nv * 3);
   for (let i = 0; i < rows; i++) {
-    const a = tubeA[i];
-    const t = Math.min(wall, 0.45 * a), r = Math.min(relief, 0.2 * a);
+    const a = tubeA[i], t = Math.min(wall, 0.45 * a), r = Math.min(relief, 0.2 * a);
     for (let j = 0; j < cols; j++) {
       const k = i * cols + j, k3 = k * 3;
-      const jj = j === nS ? 0 : j;                                   // seam column = column 0
-      const h = hS.height(UV[k * 2], UV[(i * cols + jj) * 2 + 1]);
+      const h = hS.height(UV[k * 2], j === nS ? 0 : UV[k * 2 + 1]);
       for (let c = 0; c < 3; c++) {
         O[k3 + c] = P[k3 + c] + N[k3 + c] * r * h;
         I[k3 + c] = P[k3 + c] - N[k3 + c] * t;
       }
     }
   }
-  // make seam column bit-identical to column 0 (watertight)
-  for (let i = 0; i < rows; i++) for (let c = 0; c < 3; c++) {
+  for (let i = 0; i < rows; i++) for (let c = 0; c < 3; c++) {   // seam column bit-identical
     O[(i * cols + nS) * 3 + c] = O[i * cols * 3 + c];
     I[(i * cols + nS) * 3 + c] = I[i * cols * 3 + c];
   }
 
-  // face colours
-  const ih = innerMat.color.getHex();   // sRGB
-  const innerCol = rgb15((ih >> 16) & 255, (ih >> 8) & 255, ih & 255);
-  const rimCol = rgb15(...cS.rgb(UV[(rows - 1) * cols * 2], 0.5));
-
-  // triangle list: [grid, idxA, idxB, idxC, colour]
-  const triPerValve = 4 * (rows - 1) * nS;   // outer + inner (minus apex) + rim
-  const total = triPerValve * mats.length;
-  const out = new Float32Array(total * 9);
-  const colors = new Uint16Array(total);
-  let n = 0;
-  const tmp = new THREE.Vector3();
-  const minV = new THREE.Vector3(Infinity, Infinity, Infinity), maxV = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
-
-  for (const m of mats) {
-    const flip = m.determinant() < 0;
-    const put = (G1, a, G2, b, G3, c, col) => {
-      if (flip) { const tg = G2, tb = b; G2 = G3; b = c; G3 = tg; c = tb; }
-      const o = n * 9;
-      for (const [G, idx, off] of [[G1, a, 0], [G2, b, 3], [G3, c, 6]]) {
-        tmp.set(G[idx * 3], G[idx * 3 + 1], G[idx * 3 + 2]).applyMatrix4(m).multiplyScalar(scale);
-        // three.js Y-up -> STL Z-up
-        out[o + off] = tmp.x; out[o + off + 1] = -tmp.z; out[o + off + 2] = tmp.y;
-        minV.min(v.set(out[o + off], out[o + off + 1], out[o + off + 2]));
-        maxV.max(v);
-      }
-      colors[n++] = col;
-    };
-    for (let i = 0; i < rows - 1; i++) {
-      for (let j = 0; j < nS; j++) {
-        const a0 = i * cols + j, a1 = (i + 1) * cols + j;
-        const uc = (UV[a0 * 2] + UV[a1 * 2]) / 2, vc = (j + 0.5) / nS;
-        const col = rgb15(...cS.rgb(uc, vc));
-        // outer surface (same winding as the render mesh -> normals point outward)
-        put(O, a0, O, a1, O, a1 + 1, col);
-        if (i > 0) put(O, a0, O, a1 + 1, O, a0 + 1, col);
-        // inner surface (reversed)
-        put(I, a0, I, a1 + 1, I, a1, innerCol);
-        if (i > 0) put(I, a0, I, a0 + 1, I, a1 + 1, innerCol);
-      }
+  // transformed vertices of all valves
+  const V = mats.length, per = 2 * nv;
+  const posMM = new Float32Array(V * per * 3), posGL = new Float32Array(V * per * 3);
+  const lo = new THREE.Vector3(Infinity, Infinity, Infinity), hi = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  mats.forEach((m, vi) => {
+    for (let k = 0; k < per; k++) {
+      const G = k < nv ? O : I, kk = (k < nv ? k : k - nv) * 3;
+      v.set(G[kk], G[kk + 1], G[kk + 2]).applyMatrix4(m).multiplyScalar(scale);
+      const o = (vi * per + k) * 3;
+      posGL[o] = v.x; posGL[o + 1] = v.y; posGL[o + 2] = v.z;
+      posMM[o] = v.x; posMM[o + 1] = -v.z; posMM[o + 2] = v.y;     // Y up -> Z up
+      lo.min(v.set(posMM[o], posMM[o + 1], posMM[o + 2])); hi.max(v);
     }
-    // rim at the aperture
+  });
+  const cx = (lo.x + hi.x) / 2, cy = (lo.y + hi.y) / 2, cz = lo.z;
+  for (let o = 0; o < posMM.length; o += 3) {
+    posMM[o] -= cx; posMM[o + 1] -= cy; posMM[o + 2] -= cz;
+    // glTF: same centring, Y up, metres
+    posGL[o] = posMM[o] / 1000; posGL[o + 1] = posMM[o + 2] / 1000; posGL[o + 2] = -posMM[o + 1] / 1000;
+  }
+
+  // triangles (grid indices) + kind: 0 outer, 1 inner, 2 rim
+  const nTri = V * 4 * (rows - 1) * nS;
+  const tris = new Uint32Array(nTri * 3), kind = new Uint8Array(nTri);
+  let n = 0;
+  mats.forEach((m, vi) => {
+    const flip = m.determinant() < 0, base = vi * per;
+    const put = (a, b, c, kd) => {
+      if (flip) { const t = b; b = c; c = t; }
+      tris[n * 3] = base + a; tris[n * 3 + 1] = base + b; tris[n * 3 + 2] = base + c; kind[n++] = kd;
+    };
+    for (let i = 0; i < rows - 1; i++) for (let j = 0; j < nS; j++) {
+      const a0 = i * cols + j, a1 = (i + 1) * cols + j;
+      put(a0, a1, a1 + 1, 0);
+      if (i > 0) put(a0, a1 + 1, a0 + 1, 0);
+      put(nv + a0, nv + a1 + 1, nv + a1, 1);
+      if (i > 0) put(nv + a0, nv + a0 + 1, nv + a1 + 1, 1);
+    }
     const L = (rows - 1) * cols;
     for (let j = 0; j < nS; j++) {
-      put(O, L + j, I, L + j + 1, O, L + j + 1, rimCol);
-      put(O, L + j, I, L + j, I, L + j + 1, rimCol);
+      put(L + j, nv + L + j + 1, L + j + 1, 2);
+      put(L + j, nv + L + j, nv + L + j + 1, 2);
+    }
+  });
+
+  // merged index for formats with separate texture coordinates (3MF, OBJ):
+  // seam column -> column 0, apex row -> one point shared by outer and inner surface
+  const mergeOf = new Int32Array(V * per);
+  let nm = 0;
+  const mergedPos = [];
+  for (let vi = 0; vi < V; vi++) {
+    let apex = -1;
+    for (let k = 0; k < per; k++) {
+      const gk = k < nv ? k : k - nv, i = Math.floor(gk / cols), j = gk % cols;
+      const idx = vi * per + k;
+      if (i === 0) {
+        if (apex < 0) { apex = nm++; mergedPos.push(idx); }
+        mergeOf[idx] = apex;
+      } else if (j === nS) {
+        mergeOf[idx] = -1;                                 // resolved below
+      } else {
+        mergeOf[idx] = nm++; mergedPos.push(idx);
+      }
+    }
+    for (let k = 0; k < per; k++) {
+      const idx = vi * per + k;
+      if (mergeOf[idx] === -1) mergeOf[idx] = mergeOf[idx - nS];   // same row, column 0
     }
   }
 
-  // binary STL; centre on the bed, lowest point at z = 0
-  const cx = (minV.x + maxV.x) / 2, cy = (minV.y + maxV.y) / 2, cz = minV.z;
-  const buf = new ArrayBuffer(84 + n * 50);
-  const dv = new DataView(buf);
-  const header = `Schneckenhaus3D ${params.psi.toFixed(1)}deg ${params.turns.toFixed(2)}w T${params.T.toFixed(2)} ${currentPattern} COLOR=`;
+  return { n, tris, kind, posMM, posGL, mergeOf, mergedPos, uv: UV, nv, per, V,
+           size: [hi.x - lo.x, hi.y - lo.y, hi.z - lo.z] };
+}
+
+// uv of a grid index (inner/rim share the grid uv; only outer triangles use the texture)
+const gridUV = (S, idx) => { const k = (idx % S.per) % S.nv; return [S.uv[k * 2], S.uv[k * 2 + 1]]; };
+
+const hex2 = x => x.toString(16).padStart(2, '0').toUpperCase();
+function innerRGB() { const h = innerMat.color.getHex(); return [(h >> 16) & 255, (h >> 8) & 255, h & 255]; }
+function rimRGB() { const c = imageSampler(textureCache[currentPattern].map.image, 4).rgb(0.25, 0.5); return c; }
+
+async function texturePNG() {
+  const canvas = textureCache[currentPattern].map.image;
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// --- STL ------------------------------------------------------------------------------
+const rgb15 = (r, g, b) => ((b >> 3) << 10) | ((g >> 3) << 5) | (r >> 3);   // Materialise: bit 15 = 0
+function exportSTL(S) {
+  const tex = textureCache[currentPattern];
+  const cS = imageSampler(tex.map.image, 2);
+  const ic = rgb15(...innerRGB()), rc = rgb15(...rimRGB());
+  const buf = new ArrayBuffer(84 + S.n * 50), dv = new DataView(buf);
+  const header = `Schneckenhaus3D ${params.psi.toFixed(1)}deg ${params.turns.toFixed(2)}w ${currentPattern} COLOR=`;
   for (let i = 0; i < 80; i++) dv.setUint8(i, i < header.length ? header.charCodeAt(i) & 0x7f : 0x20);
-  // default colour (RGBA) right after "COLOR="
   const [dr, dg, db] = cS.rgb(0.5, 0.5);
   dv.setUint8(header.length, dr); dv.setUint8(header.length + 1, dg); dv.setUint8(header.length + 2, db); dv.setUint8(header.length + 3, 255);
-  dv.setUint32(80, n, true);
-  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  dv.setUint32(80, S.n, true);
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
+  const p = S.posMM;
   let off = 84;
-  for (let t = 0; t < n; t++) {
-    const o = t * 9;
-    A.set(out[o] - cx, out[o + 1] - cy, out[o + 2] - cz);
-    B.set(out[o + 3] - cx, out[o + 4] - cy, out[o + 5] - cz);
-    C.set(out[o + 6] - cx, out[o + 7] - cy, out[o + 8] - cz);
-    const nrm = tmp.subVectors(C, B).cross(v.subVectors(A, B)).normalize();
+  for (let t = 0; t < S.n; t++) {
+    const a = S.tris[t * 3] * 3, b = S.tris[t * 3 + 1] * 3, c = S.tris[t * 3 + 2] * 3;
+    A.set(p[a], p[a + 1], p[a + 2]); B.set(p[b], p[b + 1], p[b + 2]); C.set(p[c], p[c + 1], p[c + 2]);
+    const nrm = t1.subVectors(C, B).cross(t2.subVectors(A, B)).normalize();
     for (const q of [nrm, A, B, C]) {
       dv.setFloat32(off, q.x || 0, true); dv.setFloat32(off + 4, q.y || 0, true); dv.setFloat32(off + 8, q.z || 0, true);
       off += 12;
     }
-    dv.setUint16(off, colors[t], true); off += 2;
+    let col = S.kind[t] === 1 ? ic : rc;
+    if (S.kind[t] === 0) {
+      const ua = gridUV(S, S.tris[t * 3]), ub = gridUV(S, S.tris[t * 3 + 1]), uc = gridUV(S, S.tris[t * 3 + 2]);
+      col = rgb15(...cS.rgb((ua[0] + ub[0] + uc[0]) / 3, (ua[1] + ub[1] + uc[1]) / 3));
+    }
+    dv.setUint16(off, col, true); off += 2;
   }
-  g.dispose();
-  return { buf, triangles: n, size: [maxV.x - minV.x, maxV.y - minV.y, maxV.z - minV.z] };
+  return new Blob([buf], { type: 'model/stl' });
 }
 
-document.getElementById('stlBtn').addEventListener('click', () => {
-  const btn = document.getElementById('stlBtn'), hint = document.getElementById('stlHint');
-  btn.disabled = true; btn.textContent = 'Erzeuge STL …';
-  setTimeout(() => {
-    try {
-      const opts = {
-        sizeMM: +document.getElementById('stlSize').value || 80,
-        wallMM: +document.getElementById('stlWall').value || 1.2,
-        reliefMM: +document.getElementById('stlRelief').value || 0,
-        quality: document.getElementById('stlQuality').value
-      };
-      const { buf, triangles, size } = buildSTL(opts);
-      const name = `${currentPreset}-${currentPattern}-${params.psi.toFixed(0)}deg-${params.turns.toFixed(1)}w.stl`;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([buf], { type: 'model/stl' }));
-      a.download = name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-      hint.textContent = `${name}: ${triangles.toLocaleString('de-DE')} Dreiecke, ` +
-        `${(buf.byteLength / 1e6).toFixed(1)} MB, ${size.map(x => x.toFixed(1)).join(' × ')} mm`;
-    } catch (err) {
-      hint.textContent = 'Export fehlgeschlagen: ' + err.message;
-      console.error(err);
+// --- 3MF ------------------------------------------------------------------------------
+async function export3MF(S) {
+  const { zipSync, strToU8 } = await import('three/addons/libs/fflate.module.js');
+  const f = x => +x.toFixed(4);
+  const parts = [];
+  const [ir, ig, ib] = innerRGB(), [rr, rg, rb] = rimRGB();
+  parts.push(`<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="de-DE" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:m="http://schemas.microsoft.com/3dmanufacturing/material/2015/02">
+<metadata name="Title">Schneckenhaus 3D – ${currentPreset} / ${PATTERNS[currentPattern].name}</metadata>
+<metadata name="Application">Schneckenhaus 3D</metadata>
+<resources>
+<basematerials id="1"><base name="Innenseite" displaycolor="#${hex2(ir)}${hex2(ig)}${hex2(ib)}FF"/><base name="Rand" displaycolor="#${hex2(rr)}${hex2(rg)}${hex2(rb)}FF"/></basematerials>
+<m:texture2d id="2" path="/3D/Textures/schale.png" contenttype="image/png" tilestyleu="wrap" tilestylev="wrap" filter="auto"/>
+<m:texture2dgroup id="3" texid="2">
+`);
+  // one tex2coord per outer grid vertex of valve 0 (all valves share the uv layout)
+  let chunk = [];
+  for (let k = 0; k < S.nv; k++) {
+    chunk.push(`<m:tex2coord u="${f(S.uv[k * 2])}" v="${f(S.uv[k * 2 + 1])}"/>`);
+    if (chunk.length > 20000) { parts.push(chunk.join('\n')); chunk = []; }
+  }
+  parts.push(chunk.join('\n'), `
+</m:texture2dgroup>
+<object id="4" type="model" name="Schneckenhaus" pid="1" pindex="0"><mesh><vertices>
+`);
+  chunk = [];
+  for (const idx of S.mergedPos) {
+    const o = idx * 3;
+    chunk.push(`<vertex x="${f(S.posMM[o])}" y="${f(S.posMM[o + 1])}" z="${f(S.posMM[o + 2])}"/>`);
+    if (chunk.length > 20000) { parts.push(chunk.join('\n')); chunk = []; }
+  }
+  parts.push(chunk.join('\n'), '\n</vertices><triangles>\n');
+  chunk = [];
+  for (let t = 0; t < S.n; t++) {
+    const a = S.tris[t * 3], b = S.tris[t * 3 + 1], c = S.tris[t * 3 + 2];
+    const ma = S.mergeOf[a], mb = S.mergeOf[b], mc = S.mergeOf[c];
+    if (ma === mb || mb === mc || ma === mc) continue;                // degenerate after merging
+    const kd = S.kind[t];
+    if (kd === 0) {
+      const tc = i => (i % S.per) % S.nv;
+      chunk.push(`<triangle v1="${ma}" v2="${mb}" v3="${mc}" pid="3" p1="${tc(a)}" p2="${tc(b)}" p3="${tc(c)}"/>`);
+    } else if (kd === 2) {
+      chunk.push(`<triangle v1="${ma}" v2="${mb}" v3="${mc}" pid="1" p1="1"/>`);
+    } else {
+      chunk.push(`<triangle v1="${ma}" v2="${mb}" v3="${mc}"/>`);
     }
-    btn.disabled = false; btn.textContent = 'STL herunterladen';
-  }, 30);
+    if (chunk.length > 20000) { parts.push(chunk.join('\n')); chunk = []; }
+  }
+  parts.push(chunk.join('\n'), '\n</triangles></mesh></object>\n</resources>\n<build><item objectid="4"/></build>\n</model>\n');
+
+  const enc = new TextEncoder();
+  const modelBytes = (() => {
+    const arrs = parts.map(p => enc.encode(p));
+    const out = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
+    let o = 0; for (const a of arrs) { out.set(a, o); o += a.length; }
+    return out;
+  })();
+  const files = {
+    '[Content_Types].xml': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+<Default Extension="png" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodeltexture"/>
+</Types>`),
+    '_rels/.rels': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>`),
+    '3D/_rels/3dmodel.model.rels': strToU8(`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Target="/3D/Textures/schale.png" Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dtexture"/>
+</Relationships>`),
+    '3D/3dmodel.model': [modelBytes, { level: 6 }],
+    '3D/Textures/schale.png': [await texturePNG(), { level: 0 }]
+  };
+  return new Blob([zipSync(files)], { type: 'model/3mf' });
+}
+
+// --- OBJ (ZIP with MTL + PNG) ----------------------------------------------------------
+async function exportOBJ(S, baseName) {
+  const { zipSync, strToU8 } = await import('three/addons/libs/fflate.module.js');
+  const f = x => +x.toFixed(4);
+  const parts = [`# Schneckenhaus 3D – ${currentPreset} / ${PATTERNS[currentPattern].name}\n# Einheit: mm, Z oben\nmtllib ${baseName}.mtl\no Schneckenhaus\n`];
+  let chunk = [];
+  for (const idx of S.mergedPos) {
+    const o = idx * 3;
+    chunk.push(`v ${f(S.posMM[o])} ${f(S.posMM[o + 1])} ${f(S.posMM[o + 2])}`);
+    if (chunk.length > 20000) { parts.push(chunk.join('\n') + '\n'); chunk = []; }
+  }
+  for (let k = 0; k < S.nv; k++) {
+    chunk.push(`vt ${f(S.uv[k * 2])} ${f(S.uv[k * 2 + 1])}`);
+    if (chunk.length > 20000) { parts.push(chunk.join('\n') + '\n'); chunk = []; }
+  }
+  parts.push(chunk.join('\n') + '\n'); chunk = [];
+  for (const [mat, kd] of [['Schale', 0], ['Innenseite', 1], ['Rand', 2]]) {
+    chunk.push(`usemtl ${mat}`);
+    for (let t = 0; t < S.n; t++) {
+      if (S.kind[t] !== kd) continue;
+      const a = S.tris[t * 3], b = S.tris[t * 3 + 1], c = S.tris[t * 3 + 2];
+      const ma = S.mergeOf[a], mb = S.mergeOf[b], mc = S.mergeOf[c];
+      if (ma === mb || mb === mc || ma === mc) continue;
+      if (kd === 0) {
+        const tc = i => (i % S.per) % S.nv + 1;
+        chunk.push(`f ${ma + 1}/${tc(a)} ${mb + 1}/${tc(b)} ${mc + 1}/${tc(c)}`);
+      } else chunk.push(`f ${ma + 1} ${mb + 1} ${mc + 1}`);
+      if (chunk.length > 20000) { parts.push(chunk.join('\n') + '\n'); chunk = []; }
+    }
+  }
+  parts.push(chunk.join('\n') + '\n');
+  const [ir, ig, ib] = innerRGB().map(x => (x / 255).toFixed(3)), [rr, rg, rb] = rimRGB().map(x => (x / 255).toFixed(3));
+  const mtl = `# Schneckenhaus 3D
+newmtl Schale
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.2 0.2 0.2
+Ns 60
+map_Kd ${baseName}.png
+
+newmtl Innenseite
+Kd ${ir} ${ig} ${ib}
+Ks 0.4 0.4 0.4
+Ns 120
+
+newmtl Rand
+Kd ${rr} ${rg} ${rb}
+`;
+  const enc = new TextEncoder();
+  const arrs = parts.map(p => enc.encode(p));
+  const obj = new Uint8Array(arrs.reduce((s, a) => s + a.length, 0));
+  let o = 0; for (const a of arrs) { obj.set(a, o); o += a.length; }
+  const files = {
+    [`${baseName}.obj`]: [obj, { level: 6 }],
+    [`${baseName}.mtl`]: strToU8(mtl),
+    [`${baseName}.png`]: [await texturePNG(), { level: 0 }]
+  };
+  return new Blob([zipSync(files)], { type: 'application/zip' });
+}
+
+// --- GLB ------------------------------------------------------------------------------
+async function exportGLB(S) {
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+  // indexed geometry on the unmerged grid (the seam needs split vertices for the uv), grouped by kind
+  const total = S.V * S.per;
+  const uv = new Float32Array(total * 2);
+  for (let idx = 0; idx < total; idx++) { const k = (idx % S.per) % S.nv; uv[idx * 2] = S.uv[k * 2]; uv[idx * 2 + 1] = S.uv[k * 2 + 1]; }
+  const order = [[], []];
+  for (let t = 0; t < S.n; t++) {
+    const a = S.tris[t * 3], b = S.tris[t * 3 + 1], c = S.tris[t * 3 + 2];
+    if (S.mergeOf[a] === S.mergeOf[b] || S.mergeOf[b] === S.mergeOf[c] || S.mergeOf[a] === S.mergeOf[c]) continue;
+    order[S.kind[t] === 0 ? 0 : 1].push(a, b, c);
+  }
+  const index = new Uint32Array(order[0].length + order[1].length);
+  index.set(order[0]); index.set(order[1], order[0].length);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(S.posGL, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(index, 1));
+  geo.addGroup(0, order[0].length, 0);
+  geo.addGroup(order[0].length, order[1].length, 1);
+  geo.computeVertexNormals();
+  const src = textureCache[currentPattern];
+  const map = new THREE.CanvasTexture(src.map.image);
+  map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  const mats = [
+    new THREE.MeshStandardMaterial({ name: 'Schale', map, roughness: 0.45 }),
+    new THREE.MeshStandardMaterial({ name: 'Innenseite', color: innerMat.color.clone(), roughness: 0.2 })
+  ];
+  const mesh = new THREE.Mesh(geo, mats);
+  mesh.name = 'Schneckenhaus';
+  const glb = await new GLTFExporter().parseAsync(mesh, { binary: true, maxTextureSize: 2048 });
+  geo.dispose(); map.dispose(); mats.forEach(m => m.dispose());
+  return new Blob([glb], { type: 'model/gltf-binary' });
+}
+
+const EXPORT_FORMATS = {
+  '3mf': { ext: '3mf', label: '3MF', hint: '3MF mit Bildtextur (für 3D-Druck, Windows 3D Viewer, Bambu/Orca/Prusa lesen die Form)' },
+  obj:   { ext: 'zip', label: 'OBJ', hint: 'ZIP mit OBJ, MTL und PNG-Textur (Blender, Bambu Studio, die meisten 3D-Programme)' },
+  glb:   { ext: 'glb', label: 'GLB', hint: 'glTF-Binärdatei mit eingebetteter Textur (Blender, Web, AR, macOS-Vorschau)' },
+  stl:   { ext: 'stl', label: 'STL', hint: 'STL ohne Bildtextur: Muster als Relief, Farben pro Dreieck (Materialise-Format)' }
+};
+const elFormat = document.getElementById('exportFormat');
+const updateExportUI = () => {
+  const F = EXPORT_FORMATS[elFormat.value];
+  document.getElementById('exportBtn').textContent = `${F.label} herunterladen`;
+  document.getElementById('exportHint').textContent = F.hint;
+};
+elFormat.addEventListener('change', updateExportUI);
+updateExportUI();
+
+document.getElementById('exportBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('exportBtn'), hint = document.getElementById('exportHint');
+  const fmt = elFormat.value, F = EXPORT_FORMATS[fmt];
+  btn.disabled = true; btn.textContent = `Erzeuge ${F.label} …`;
+  await new Promise(r => setTimeout(r, 30));
+  try {
+    const S = buildSolid({
+      sizeMM: +document.getElementById('stlSize').value || 80,
+      wallMM: +document.getElementById('stlWall').value || 1.2,
+      reliefMM: +document.getElementById('stlRelief').value || 0,
+      quality: document.getElementById('stlQuality').value
+    });
+    const baseName = `${currentPreset}-${currentPattern}-${params.psi.toFixed(0)}deg-${params.turns.toFixed(1)}w`;
+    const blob = fmt === 'stl' ? exportSTL(S)
+               : fmt === '3mf' ? await export3MF(S)
+               : fmt === 'obj' ? await exportOBJ(S, baseName)
+               : await exportGLB(S);
+    const name = `${baseName}.${F.ext}`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 20000);
+    hint.textContent = `${name}: ${S.n.toLocaleString('de-DE')} Dreiecke, ${(blob.size / 1e6).toFixed(1)} MB, ` +
+      `${S.size.map(x => x.toFixed(1)).join(' × ')} mm`;
+  } catch (err) {
+    hint.textContent = 'Export fehlgeschlagen: ' + err.message;
+    console.error(err);
+  }
+  btn.disabled = false; btn.textContent = `${F.label} herunterladen`;
 });
 
 // ---------------------------------------------------------------------------
